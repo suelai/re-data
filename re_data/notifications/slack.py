@@ -105,7 +105,7 @@ def add_footer(message_obj, subtitle):
     return message_obj
 
 
-def truncate_table_name(table_name: str, max_length: int = 150) -> str:
+def truncate_table_name(table_name: str, max_length: int = 200) -> str:
     """
     Truncate table name if it's too long for Slack display.
     """

@@ -116,8 +116,7 @@ def format_table_name(table_name: str) -> str:
     dataset = parts[-2] if len(parts) >= 3 else parts[0]
     table = parts[-1]
 
-    # Remove long prefixes
-    for prefix in [
+    tracking_types = [
         "acquisition_ltv_predictions_log_dev_workflow_extended_",
         "ltv_predictions_log_dev_workflow_extended_",
         "acquisition_tracking_simple_",
@@ -125,10 +124,17 @@ def format_table_name(table_name: str) -> str:
         "anomaly_tracking_simple_",
         "anomaly_tracking_",
         "estuary_tracking_",
-    ]:
-        if table.startswith(prefix):
-            table = table[len(prefix) :]
-            break
+        "acquisition_table_",
+    ]
+
+    for tracking_type in tracking_types:
+        # Check if table contains this tracking type
+        if tracking_type in table:
+            # Split at the tracking type and take everything after it
+            idx = table.find(tracking_type)
+            if idx != -1:
+                table = table[idx + len(tracking_type) :]
+                break
 
     return f"{dataset}.{table}"
 
@@ -154,16 +160,9 @@ def generate_slack_message(model, details, owners, subtitle: str, selected_alert
     if info_parts:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(info_parts)}})
 
-    blocks.append(
-        {
-            "type": "section",
-            "fields": [
-                {"type": "plain_text", "text": f":warning: {len(anomalies)} anomalies", "emoji": True},
-                {"type": "plain_text", "text": f":bulb: {len(schema_changes)} schema changes", "emoji": True},
-                {"type": "plain_text", "text": f":bangbang: {len(tests)} failed tests", "emoji": True},
-            ],
-        }
-    )
+    # Alert summary in horizontal format with | separators
+    alert_summary = f":warning: {len(anomalies)} anomalies  |  :bulb: {len(schema_changes)} schema changes  |  :bangbang: {len(tests)} failed tests"
+    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": alert_summary}})
 
     message_obj = {"blocks": blocks}
 

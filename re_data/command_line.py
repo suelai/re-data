@@ -509,12 +509,12 @@ def slack(start_date, end_date, webhook_url, subtitle, re_data_target_dir, selec
             # Extract tags from nodes (models and sources)
             for node_id, node in manifest.get("nodes", {}).items():
                 if "tags" in node:
-                    # Get the full table name (database.schema.name)
+                    # Get the full table name (database.schema.name) - without quotes to match alert format
                     database = node.get("database", "")
                     schema = node.get("schema", "")
                     name = node.get("name", "")
                     if database and schema and name:
-                        full_name = f'"{database}"."{schema}"."{name}"'
+                        full_name = f"{database}.{schema}.{name}"
                         tags_by_model[full_name] = node["tags"]
             # Also check sources
             for source_id, source in manifest.get("sources", {}).items():
@@ -523,7 +523,7 @@ def slack(start_date, end_date, webhook_url, subtitle, re_data_target_dir, selec
                     schema = source.get("schema", "")
                     name = source.get("name", "")
                     if database and schema and name:
-                        full_name = f'"{database}"."{schema}"."{name}"'
+                        full_name = f"{database}.{schema}.{name}"
                         tags_by_model[full_name] = source["tags"]
 
     slack_members = build_notification_identifiers_per_model(monitored_list=monitored, channel="slack")

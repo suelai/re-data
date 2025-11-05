@@ -105,66 +105,67 @@ def add_footer(message_obj, subtitle):
     return message_obj
 
 
-def truncate_table_name(table_name: str, max_length: int = 200) -> str:
-    """
-    Truncate table name if it's too long for Slack display.
-    """
-    if len(table_name) <= max_length:
+def format_table_name(table_name: str) -> str:
+    """Format table name for Slack: remove quotes, extract dataset.table, remove long prefixes."""
+    table_name = table_name.replace('"', "").replace("`", "")
+    parts = table_name.split(".")
+
+    if len(parts) < 2:
         return table_name
 
-    # Try to keep the most important parts (project.dataset.table)
-    parts = table_name.split(".")
-    if len(parts) >= 3:
-        # Keep project, truncate dataset, keep table name
-        project = parts[0]
-        table = parts[-1]
-        dataset = ".".join(parts[1:-1])
+    dataset = parts[-2] if len(parts) >= 3 else parts[0]
+    table = parts[-1]
 
-        # Calculate available space
-        available = max_length - len(project) - len(table) - 2  # 2 for dots
-        if available > 10:  # Ensure we have some space for dataset
-            truncated_dataset = dataset[:available] + "..."
-            return f"{project}.{truncated_dataset}.{table}"
+    # Remove long prefixes
+    for prefix in [
+        "acquisition_ltv_predictions_log_dev_workflow_extended_",
+        "ltv_predictions_log_dev_workflow_extended_",
+        "acquisition_tracking_simple_",
+        "acquisition_tracking_",
+        "anomaly_tracking_simple_",
+        "anomaly_tracking_",
+        "estuary_tracking_",
+    ]:
+        if table.startswith(prefix):
+            table = table[len(prefix) :]
+            break
 
-    # Fallback: just truncate the whole thing
-    return table_name[: max_length - 3] + "..."
+    return f"{dataset}.{table}"
 
 
-def generate_slack_message(model, details, owners, subtitle: str, selected_alert_types: set) -> dict:
-    """
-    Generates a slack message for a given model.
-    """
+def generate_slack_message(model, details, owners, subtitle: str, selected_alert_types: set, tags: list = None) -> dict:
+    """Generates a slack message for a given model."""
     anomalies = details["anomalies"]
     schema_changes = details["schema_changes"]
     tests = details["tests"]
     slack_owners = [k[0] for k in owners]
+    formatted_table = format_table_name(model)
 
-    # Truncate table name if too long
-    truncated_model = truncate_table_name(model)
+    # Build info text with tags and owners
+    info_parts = []
+    if tags:
+        info_parts.append(f":label: {', '.join([f'`{tag}`' for tag in tags])}")
+    if slack_owners:
+        info_parts.append(f":busts_in_silhouette: {', '.join(slack_owners)}")
 
-    message_obj = {
-        "blocks": [
-            {
-                "type": "header",
-                "text": {"type": "plain_text", "text": "Table: {}".format(truncated_model), "emoji": True},
-            },
-            {"type": "divider"},
-            {"type": "section", "text": {"type": "mrkdwn", "text": "Owners: {}".format(", ".join(slack_owners))}},
-            {"type": "divider"},
-            {
-                "type": "section",
-                "fields": [
-                    {"type": "plain_text", "text": ":warning: {} anomalies".format(len(anomalies)), "emoji": True},
-                    {
-                        "type": "plain_text",
-                        "text": ":bulb: {} schema changes".format(len(schema_changes)),
-                        "emoji": True,
-                    },
-                    {"type": "plain_text", "text": ":bangbang: {} failed tests".format(len(tests)), "emoji": True},
-                ],
-            },
-        ]
-    }
+    # Build message blocks
+    blocks = [{"type": "header", "text": {"type": "plain_text", "text": f":mag: {formatted_table}", "emoji": True}}]
+
+    if info_parts:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(info_parts)}})
+
+    blocks.append(
+        {
+            "type": "section",
+            "fields": [
+                {"type": "plain_text", "text": f":warning: {len(anomalies)} anomalies", "emoji": True},
+                {"type": "plain_text", "text": f":bulb: {len(schema_changes)} schema changes", "emoji": True},
+                {"type": "plain_text", "text": f":bangbang: {len(tests)} failed tests", "emoji": True},
+            ],
+        }
+    )
+
+    message_obj = {"blocks": blocks}
 
     # Add alert sections with size limits
     if anomalies and "anomaly" in selected_alert_types:

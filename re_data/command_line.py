@@ -506,19 +506,16 @@ def slack(start_date, end_date, webhook_url, subtitle, re_data_target_dir, selec
     if os.path.exists(dbt_manifest_path):
         with open(dbt_manifest_path) as f:
             manifest = json.load(f)
-            # Extract tags from nodes (models and sources)
             for node_id, node in manifest.get("nodes", {}).items():
-                if "tags" in node:
-                    # Get the full table name (database.schema.name) - without quotes to match alert format
+                if "tags" in node and node["tags"]:
                     database = node.get("database", "")
                     schema = node.get("schema", "")
-                    name = node.get("name", "")
-                    if database and schema and name:
-                        full_name = f"{database}.{schema}.{name}"
+                    alias = node.get("alias", node.get("name", ""))
+                    if database and schema and alias:
+                        full_name = f"{database}.{schema}.{alias}"
                         tags_by_model[full_name] = node["tags"]
-            # Also check sources
             for source_id, source in manifest.get("sources", {}).items():
-                if "tags" in source:
+                if "tags" in source and source["tags"]:
                     database = source.get("database", "")
                     schema = source.get("schema", "")
                     name = source.get("name", "")
